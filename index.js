@@ -147,6 +147,13 @@ app.get("/set-group/:groupName", async (req, res) => {
   }
 });
 
+app.get("/", async (req, res) => {
+  
+    res.json({ message: "welcome to whatsapp scheduler" });
+  
+});
+
+
 // Endpoint to trigger immediate message
 app.get("/send-message", async (req, res) => {
   const success = await sendWhatsAppMessage();
