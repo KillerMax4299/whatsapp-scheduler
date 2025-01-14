@@ -3,6 +3,8 @@
 # Logs
 
 logs
+.wwebjs_auth
+.wwebjs_cache
 _.log
 npm-debug.log_
 yarn-debug.log*

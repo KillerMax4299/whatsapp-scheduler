@@ -6,6 +6,8 @@ const dotenv = require("dotenv");
 
 dotenv.config();
 const app = express();
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
 const port = process.env.PORT || 3000;
 
 // Initialize WhatsApp client
@@ -71,6 +73,22 @@ async function sendWhatsAppMessage() {
   }
 }
 
+async function sendWhatsAppText(req) {
+  if (!targetGroupId) {
+    console.error("No group ID set. Please set group ID first.");
+    return false;
+  }
+
+  try {
+    await client.sendMessage(targetGroupId, req.body.message);
+    console.log("Message sent successfully");
+    return true;
+  } catch (error) {
+    console.error("Error sending message:", error);
+    return false;
+  }
+}
+
 // Check every minute if it's time to send the scheduled message
 cron.schedule(
   "* * * * *",
@@ -114,6 +132,58 @@ cron.schedule(
   }
 );
 
+app.get("/set-chat/:chatName", async (req, res) => {
+  try {
+    const groupName = req.params.chatName;
+
+    const chats = await client.getChats();
+
+    const groupsList = chats.filter(
+      (chat) => chat.id && chat.id.server === "c.us"
+    );
+
+    const groupNameList = groupsList.map((groups) => groups.name);
+
+    const groupIndex = groupNameList.indexOf(groupName);
+
+    if (!groupNameList.includes(groupName)) {
+      return res.status(404).json({
+        groupNameList,
+      });
+    }
+
+    targetGroupId = groupsList[groupIndex].id._serialized;
+
+    res.json({
+      message: `Group set to: ${groupsList[groupIndex].name}`,
+      groupId: targetGroupId,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error setting group",
+      error: error.message,
+    });
+  }
+});
+
+app.get("/set-chat-id/:id", async (req, res) => {
+  try {
+    const groupName = req.params.id;
+
+    targetGroupId = "91" + groupName + "@c.us";
+
+    res.json({
+      message: `Id set to: ${targetGroupId}`,
+      groupId: targetGroupId,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error setting group",
+      error: error.message,
+    });
+  }
+});
+
 // Endpoint to set target group
 app.get("/set-group/:groupName", async (req, res) => {
   try {
@@ -148,11 +218,8 @@ app.get("/set-group/:groupName", async (req, res) => {
 });
 
 app.get("/", async (req, res) => {
-  
-    res.json({ message: "welcome to whatsapp scheduler" });
-  
+  res.json({ message: "welcome to whatsapp scheduler" });
 });
-
 
 // Endpoint to trigger immediate message
 app.get("/send-message", async (req, res) => {
@@ -164,11 +231,20 @@ app.get("/send-message", async (req, res) => {
   }
 });
 
+app.post("/send-message", async (req, res) => {
+  const success = await sendWhatsAppText(req);
+  if (success) {
+    res.json({ message: "Message sent successfully" });
+  } else {
+    res.status(500).json({ message: "Failed to send message" });
+  }
+});
+
 // New endpoint to schedule message for next day midnight
-app.get("/schedule-for-tomorrow",async (req, res) => {
+app.get("/schedule-for-tomorrow", async (req, res) => {
   const now = new Date();
   const tomorrow = new Date(now);
-  tomorrow.setDate(tomorrow.getDate()+1);
+  tomorrow.setDate(tomorrow.getDate() + 1);
   tomorrow.setHours(0, 0, 0, 0); // Set to midnight
 
   // Check if current time is between 00:01 and 23:59
