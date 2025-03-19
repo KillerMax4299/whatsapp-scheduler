@@ -3,12 +3,35 @@ const { Client, LocalAuth } = require("whatsapp-web.js");
 const qrcode = require("qrcode-terminal");
 const cron = require("node-cron");
 const dotenv = require("dotenv");
+const swaggerJsdoc = require("swagger-jsdoc");
+const swaggerUi = require("swagger-ui-express");
 
 dotenv.config();
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 const port = process.env.PORT || 3000;
+
+// Swagger setup
+const options = {
+  definition: {
+    openapi: "3.0.0",
+    info: {
+      title: "WhatsApp Scheduler API",
+      version: "1.0.0",
+      description: "API for scheduling WhatsApp messages",
+    },
+    servers: [
+      {
+        url: `http://localhost:${port}`,
+      },
+    ],
+  },
+  apis: ["./index.js"], // Path to the API docs
+};
+
+const specs = swaggerJsdoc(options);
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(specs));
 
 // Initialize WhatsApp client
 const client = new Client({
@@ -64,7 +87,7 @@ async function sendWhatsAppMessage() {
   }
 
   try {
-    await client.sendMessage(targetGroupId, "Today 1st trip & 1st trip return");
+    await client.sendMessage(targetGroupId, "1st trip");
     console.log("Message sent successfully");
     return true;
   } catch (error) {
@@ -132,6 +155,26 @@ cron.schedule(
   }
 );
 
+// /**
+//  * @swagger
+//  * /set-chat/{chatName}:
+//  *   get:
+//  *     summary: Set the target chat by name
+//  *     parameters:
+//  *       - in: path
+//  *         name: chatName
+//  *         required: true
+//  *         schema:
+//  *           type: string
+//  *         description: The name of the chat to set as target
+//  *     responses:
+//  *       200:
+//  *         description: Chat set successfully
+//  *       404:
+//  *         description: Chat not found
+//  *       500:
+//  *         description: Error setting chat
+//  */
 app.get("/set-chat/:chatName", async (req, res) => {
   try {
     const groupName = req.params.chatName;
@@ -166,6 +209,24 @@ app.get("/set-chat/:chatName", async (req, res) => {
   }
 });
 
+// /**
+//  * @swagger
+//  * /set-chat-id/{id}:
+//  *   get:
+//  *     summary: Set the target chat by ID
+//  *     parameters:
+//  *       - in: path
+//  *         name: id
+//  *         required: true
+//  *         schema:
+//  *           type: string
+//  *         description: The ID of the chat to set as target
+//  *     responses:
+//  *       200:
+//  *         description: Chat ID set successfully
+//  *       500:
+//  *         description: Error setting chat ID
+//  */
 app.get("/set-chat-id/:id", async (req, res) => {
   try {
     const groupName = req.params.id;
@@ -184,7 +245,27 @@ app.get("/set-chat-id/:id", async (req, res) => {
   }
 });
 
-// Endpoint to set target group
+/**
+ * @swagger
+ * /set-group/{groupName}:
+ *   get:
+ *     summary: Set the target group by name
+ *     parameters:
+ *       - in: path
+ *         name: groupName
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "Office Car"
+ *         description: The name of the group to set as target
+ *     responses:
+ *       200:
+ *         description: Group set successfully
+ *       404:
+ *         description: Group not found
+ *       500:
+ *         description: Error setting group
+ */
 app.get("/set-group/:groupName", async (req, res) => {
   try {
     const groupName = req.params.groupName;
@@ -217,11 +298,30 @@ app.get("/set-group/:groupName", async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /:
+ *   get:
+ *     summary: Welcome message
+ *     responses:
+ *       200:
+ *         description: Welcome message
+ */
 app.get("/", async (req, res) => {
   res.json({ message: "welcome to whatsapp scheduler" });
 });
 
-// Endpoint to trigger immediate message
+/**
+ * @swagger
+ * /send-message:
+ *   get:
+ *     summary: Send a WhatsApp message immediately
+ *     responses:
+ *       200:
+ *         description: Message sent successfully
+ *       500:
+ *         description: Failed to send message
+ */
 app.get("/send-message", async (req, res) => {
   const success = await sendWhatsAppMessage();
   if (success) {
@@ -231,6 +331,26 @@ app.get("/send-message", async (req, res) => {
   }
 });
 
+// /**
+//  * @swagger
+//  * /send-message:
+//  *   post:
+//  *     summary: Send a custom WhatsApp message
+//  *     requestBody:
+//  *       required: true
+//  *       content:
+//  *         application/json:
+//  *           schema:
+//  *             type: object
+//  *             properties:
+//  *               message:
+//  *                 type: string
+//  *     responses:
+//  *       200:
+//  *         description: Message sent successfully
+//  *       500:
+//  *         description: Failed to send message
+//  */
 app.post("/send-message", async (req, res) => {
   const success = await sendWhatsAppText(req);
   if (success) {
@@ -240,7 +360,17 @@ app.post("/send-message", async (req, res) => {
   }
 });
 
-// New endpoint to schedule message for next day midnight
+/**
+ * @swagger
+ * /schedule-for-tomorrow:
+ *   get:
+ *     summary: Schedule a message for tomorrow at midnight
+ *     responses:
+ *       200:
+ *         description: Message scheduled successfully
+ *       400:
+ *         description: Cannot schedule at midnight or tomorrow is not a working day
+ */
 app.get("/schedule-for-tomorrow", async (req, res) => {
   const now = new Date();
   const tomorrow = new Date(now);
@@ -278,7 +408,15 @@ app.get("/schedule-for-tomorrow", async (req, res) => {
   });
 });
 
-// Endpoint to check schedule status
+/**
+ * @swagger
+ * /schedule-status:
+ *   get:
+ *     summary: Check the status of the scheduled message
+ *     responses:
+ *       200:
+ *         description: Schedule status retrieved successfully
+ */
 app.get("/schedule-status", (req, res) => {
   if (!scheduledMessageData.isScheduled) {
     res.json({ message: "No message currently scheduled" });
@@ -295,6 +433,6 @@ app.get("/schedule-status", (req, res) => {
 // Start WhatsApp client and server
 client.initialize();
 
-app.listen(3000, () => {
-  console.log(`Server running on port ${3000}`);
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
 });
