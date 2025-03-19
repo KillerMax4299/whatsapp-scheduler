@@ -5,6 +5,19 @@ const cron = require("node-cron");
 const dotenv = require("dotenv");
 const swaggerJsdoc = require("swagger-jsdoc");
 const swaggerUi = require("swagger-ui-express");
+const os = require('os');
+
+function getLocalIp() {
+    const interfaces = os.networkInterfaces();
+    for (const iface of Object.values(interfaces)) {
+        for (const config of iface) {
+            if (config.family === 'IPv4' && !config.internal) {
+                return config.address;
+            }
+        }
+    }
+    return 'No network connection';
+}
 
 dotenv.config();
 const app = express();
@@ -308,7 +321,11 @@ app.get("/set-group/:groupName", async (req, res) => {
  *         description: Welcome message
  */
 app.get("/", async (req, res) => {
-  res.json({ message: "welcome to whatsapp scheduler" });
+  res.json({
+    message: "welcome to whatsapp scheduler",
+    local: `http://localhost:${port}/api-docs/`,
+    ipv4: `http://${getLocalIp()}:${port}/api-docs/`,
+  });
 });
 
 /**
@@ -433,6 +450,11 @@ app.get("/schedule-status", (req, res) => {
 // Start WhatsApp client and server
 client.initialize();
 
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+// app.listen(port, () => {
+//   console.log(`Server running on port ${port}`);
+// });
+
+app.listen(port, "0.0.0.0", () => {
+  console.log(`Server running at http://localhost:${port}/api-docs/`);
+  console.log(`Access from other devices using your computer's IP address`);
 });
