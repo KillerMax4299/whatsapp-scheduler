@@ -1,5 +1,6 @@
 const express = require("express");
 const { Client, LocalAuth } = require("whatsapp-web.js");
+const electron = require("wwebjs-electron");
 const qrcode = require("qrcode-terminal");
 const cron = require("node-cron");
 const dotenv = require("dotenv");
@@ -38,6 +39,9 @@ const options = {
       {
         url: `http://localhost:${port}`,
       },
+      {
+        url: `http://${getLocalIp()}:${port}`,
+      },
     ],
   },
   apis: ["./index.js"], // Path to the API docs
@@ -49,9 +53,8 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(specs));
 // Initialize WhatsApp client
 const client = new Client({
   authStrategy: new LocalAuth(),
-  puppeteer: {
-    args: ["--no-sandbox"],
-  },
+  puppeteer: electron,
+  // No need to specify webVersion
 });
 
 // Store group chat ID and scheduled message data
@@ -109,21 +112,21 @@ async function sendWhatsAppMessage() {
   }
 }
 
-async function sendWhatsAppText(req) {
-  if (!targetGroupId) {
-    console.error("No group ID set. Please set group ID first.");
-    return false;
-  }
+// async function sendWhatsAppText(req) {
+//   if (!targetGroupId) {
+//     console.error("No group ID set. Please set group ID first.");
+//     return false;
+//   }
 
-  try {
-    await client.sendMessage(targetGroupId, req.body.message);
-    console.log("Message sent successfully");
-    return true;
-  } catch (error) {
-    console.error("Error sending message:", error);
-    return false;
-  }
-}
+//   try {
+//     await client.sendMessage(targetGroupId, req.body.message);
+//     console.log("Message sent successfully");
+//     return true;
+//   } catch (error) {
+//     console.error("Error sending message:", error);
+//     return false;
+//   }
+// }
 
 // Check every minute if it's time to send the scheduled message
 cron.schedule(
@@ -168,95 +171,7 @@ cron.schedule(
   }
 );
 
-// /**
-//  * @swagger
-//  * /set-chat/{chatName}:
-//  *   get:
-//  *     summary: Set the target chat by name
-//  *     parameters:
-//  *       - in: path
-//  *         name: chatName
-//  *         required: true
-//  *         schema:
-//  *           type: string
-//  *         description: The name of the chat to set as target
-//  *     responses:
-//  *       200:
-//  *         description: Chat set successfully
-//  *       404:
-//  *         description: Chat not found
-//  *       500:
-//  *         description: Error setting chat
-//  */
-app.get("/set-chat/:chatName", async (req, res) => {
-  try {
-    const groupName = req.params.chatName;
 
-    const chats = await client.getChats();
-
-    const groupsList = chats.filter(
-      (chat) => chat.id && chat.id.server === "c.us"
-    );
-
-    const groupNameList = groupsList.map((groups) => groups.name);
-
-    const groupIndex = groupNameList.indexOf(groupName);
-
-    if (!groupNameList.includes(groupName)) {
-      return res.status(404).json({
-        groupNameList,
-      });
-    }
-
-    targetGroupId = groupsList[groupIndex].id._serialized;
-
-    res.json({
-      message: `Group set to: ${groupsList[groupIndex].name}`,
-      groupId: targetGroupId,
-    });
-  } catch (error) {
-    res.status(500).json({
-      message: "Error setting group",
-      error: error.message,
-    });
-  }
-});
-
-// /**
-//  * @swagger
-//  * /set-chat-id/{id}:
-//  *   get:
-//  *     summary: Set the target chat by ID
-//  *     parameters:
-//  *       - in: path
-//  *         name: id
-//  *         required: true
-//  *         schema:
-//  *           type: string
-//  *         description: The ID of the chat to set as target
-//  *     responses:
-//  *       200:
-//  *         description: Chat ID set successfully
-//  *       500:
-//  *         description: Error setting chat ID
-//  */
-app.get("/set-chat-id/:id", async (req, res) => {
-  try {
-    const groupName = req.params.id;
-
-    targetGroupId = "91" + groupName + "@c.us";
-
-    res.json({
-      message: `Id set to: ${targetGroupId}`,
-      groupId: targetGroupId,
-    });
-  } catch (error) {
-    res.status(500).json({
-      message: "Error setting group",
-      error: error.message,
-    });
-  }
-});
 
 /**
  * @swagger
@@ -328,54 +243,7 @@ app.get("/", async (req, res) => {
   });
 });
 
-/**
- * @swagger
- * /send-message:
- *   get:
- *     summary: Send a WhatsApp message immediately
- *     responses:
- *       200:
- *         description: Message sent successfully
- *       500:
- *         description: Failed to send message
- */
-app.get("/send-message", async (req, res) => {
-  const success = await sendWhatsAppMessage();
-  if (success) {
-    res.json({ message: "Message sent successfully" });
-  } else {
-    res.status(500).json({ message: "Failed to send message" });
-  }
-});
 
-// /**
-//  * @swagger
-//  * /send-message:
-//  *   post:
-//  *     summary: Send a custom WhatsApp message
-//  *     requestBody:
-//  *       required: true
-//  *       content:
-//  *         application/json:
-//  *           schema:
-//  *             type: object
-//  *             properties:
-//  *               message:
-//  *                 type: string
-//  *     responses:
-//  *       200:
-//  *         description: Message sent successfully
-//  *       500:
-//  *         description: Failed to send message
-//  */
-app.post("/send-message", async (req, res) => {
-  const success = await sendWhatsAppText(req);
-  if (success) {
-    res.json({ message: "Message sent successfully" });
-  } else {
-    res.status(500).json({ message: "Failed to send message" });
-  }
-});
 
 /**
  * @swagger
@@ -455,6 +323,6 @@ client.initialize();
 // });
 
 app.listen(port, "0.0.0.0", () => {
-  console.log(`Server running at http://localhost:${port}/api-docs/`);
-  console.log(`Access from other devices using your computer's IP address`);
+  console.log(`Server running at http://localhost:${port}`);
+  // console.log(`Access from other devices using your computer's IP address`);
 });
